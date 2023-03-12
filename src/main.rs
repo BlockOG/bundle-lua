@@ -26,7 +26,7 @@ fn main() {
         return;
     }
 
-    if !output.is_file() {
+    if output.exists() && !output.is_file() {
         println!("Output has to be a file.");
         return;
     }
@@ -100,7 +100,18 @@ ____bundle__files[{:?}] = ____bundle__files[{:?}]
         }
     };
 
-    output_contents.push_str(main_contents.as_str());
+    if main_contents.starts_with(
+        "local ____bundle__files = {}
+local ____bundle__global_require = require
+local require = function(path)
+    return ____bundle__files[path] or ____bundle__global_require(path)
+end
+",
+    ) {
+        output_contents.push_str(&main_contents[178..]);
+    } else {
+        output_contents.push_str(&main_contents);
+    }
 
     match output_file.write_all(output_contents.as_bytes()) {
         Ok(_) => (),
