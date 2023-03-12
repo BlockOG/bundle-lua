@@ -8,22 +8,16 @@ use clap::{arg, command, value_parser, ArgAction::Append};
 
 fn main() {
     let matches = command!() // requires `cargo` feature
-        .arg(arg!([OUTPUT] "Output file").value_parser(value_parser!(PathBuf)))
-        .arg(arg!([MAIN] "Main file").value_parser(value_parser!(PathBuf)))
+        .arg(arg!(<OUTPUT> "Output file").value_parser(value_parser!(PathBuf)))
+        .arg(arg!(<MAIN> "Main file").value_parser(value_parser!(PathBuf)))
         .arg(
-            arg!([PACKAGES] "Packages to bundle")
+            arg!(<PACKAGES> "Packages to bundle")
                 .value_parser(value_parser!(PathBuf))
                 .action(Append),
         )
         .get_matches();
 
-    let packages: Vec<&PathBuf> = match matches.get_many::<PathBuf>("PACKAGES") {
-        Some(packages) => packages.collect(),
-        None => {
-            println!("You probably want at least one package.");
-            return;
-        }
-    };
+    let packages: Vec<&PathBuf> = matches.get_many::<PathBuf>("PACKAGES").unwrap().collect();
     let output = matches.get_one::<PathBuf>("OUTPUT").unwrap();
     let main = matches.get_one::<PathBuf>("MAIN").unwrap();
 
