@@ -1,0 +1,12 @@
+[package]
+name = "bundle-lua"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Bundle Lua scripts into a single file"
+homepage = "https://github.com/BlockOG/bundle-lua"
+repository = "https://github.com/BlockOG/bundle-lua"
+readme = "README.md"
+
+[dependencies]
+clap = { version = "4.1.8", features = ["cargo"] }
