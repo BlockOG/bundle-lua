@@ -9,9 +9,10 @@ use clap::{arg, command, value_parser, ArgAction::Append};
 fn main() {
     let matches = command!() // requires `cargo` feature
         .arg(arg!(<OUTPUT> "Output file").value_parser(value_parser!(PathBuf)))
-        .arg(arg!(<MAIN> "Main file").value_parser(value_parser!(PathBuf)))
+        .arg(arg!(<SOURCE_DIR> "Source directory").value_parser(value_parser!(PathBuf)))
+        .arg(arg!(<MAIN> "Main file (relative)").value_parser(value_parser!(PathBuf)))
         .arg(
-            arg!(<PACKAGES> "Packages to bundle")
+            arg!(<PACKAGES> "Packages to bundle (relative, use the path you would use in require)")
                 .value_parser(value_parser!(PathBuf))
                 .action(Append),
         )
@@ -19,7 +20,13 @@ fn main() {
 
     let packages: Vec<&PathBuf> = matches.get_many::<PathBuf>("PACKAGES").unwrap().collect();
     let output = matches.get_one::<PathBuf>("OUTPUT").unwrap();
-    let main = matches.get_one::<PathBuf>("MAIN").unwrap();
+    let source_dir = matches.get_one::<PathBuf>("SOURCE_DIR").unwrap();
+    let main = &source_dir.join(matches.get_one::<PathBuf>("MAIN").unwrap());
+
+    if !source_dir.is_dir() {
+        println!("Source directory has to be a directory.");
+        return;
+    }
 
     if !main.is_file() {
         println!("Main has to be a file.");
@@ -39,15 +46,26 @@ fn main() {
         }
     };
 
-    let mut output_contents = "local ____bundle__files = {}
+    let mut output_contents = "local ____bundle__funcs = {}
+local ____bundle__files = {}
 local ____bundle__global_require = require
 local require = function(path)
-    return ____bundle__files[path] or ____bundle__global_require(path)
+    if ____bundle__files[path] then
+        return ____bundle__files[path]
+    elseif ____bundle__funcs[path] then
+        ____bundle__files[path] = ____bundle__funcs[path]()
+        return ____bundle__files[path]
+    end
+    return ____bundle__global_require(path)
 end
 "
     .to_owned();
 
     for package in packages {
+        let mut package = source_dir.join(package);
+        package.set_extension("lua");
+        let package = &package;
+
         if !package.is_file() {
             println!("Packages have to be files. ({})", package.display());
             return;
@@ -71,15 +89,12 @@ end
         };
 
         output_contents.push_str(&format!(
-            "____bundle__files[{:?}] = (function()
+            "____bundle__funcs[{:?}] = function()
 {}
-end)()
-____bundle__files[{:?}] = ____bundle__files[{:?}]
+end
 ",
             package.file_stem().unwrap(),
             package_contents,
-            package.file_name().unwrap(),
-            package.file_stem().unwrap()
         ));
     }
 
@@ -101,10 +116,17 @@ ____bundle__files[{:?}] = ____bundle__files[{:?}]
     };
 
     if main_contents.starts_with(
-        "local ____bundle__files = {}
+        "local ____bundle__funcs = {}
+local ____bundle__files = {}
 local ____bundle__global_require = require
 local require = function(path)
-    return ____bundle__files[path] or ____bundle__global_require(path)
+    if ____bundle__files[path] then
+        return ____bundle__files[path]
+    elseif ____bundle__funcs[path] then
+        ____bundle__files[path] = ____bundle__funcs[path]()
+        return ____bundle__files[path]
+    end
+    return ____bundle__global_require(path)
 end
 ",
     ) {
