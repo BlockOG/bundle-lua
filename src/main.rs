@@ -46,9 +46,8 @@ fn main() {
         }
     };
 
-    let mut output_contents = "local ____bundle__funcs = {}
-local ____bundle__files = {}
-local ____bundle__global_require = require
+    let mut output_contents =
+        "local ____bundle__funcs, ____bundle__files, ____bundle__global_require = {}, {}, require
 local require = function(path)
     if ____bundle__files[path] then
         return ____bundle__files[path]
@@ -59,7 +58,7 @@ local require = function(path)
     return ____bundle__global_require(path)
 end
 "
-    .to_owned();
+        .to_owned();
 
     for package in packages {
         let mut package = source_dir.join(package);
@@ -116,9 +115,7 @@ end
     };
 
     if main_contents.starts_with(
-        "local ____bundle__funcs = {}
-local ____bundle__files = {}
-local ____bundle__global_require = require
+        "local ____bundle__funcs, ____bundle__files, ____bundle__global_require = {}, {}, require
 local require = function(path)
     if ____bundle__files[path] then
         return ____bundle__files[path]
@@ -130,7 +127,7 @@ local require = function(path)
 end
 ",
     ) {
-        output_contents.push_str(&main_contents[178..]);
+        output_contents.push_str(&main_contents[390..]);
     } else {
         output_contents.push_str(&main_contents);
     }
