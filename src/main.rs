@@ -5,6 +5,7 @@ use std::{
 };
 
 use clap::{arg, command, value_parser, ArgAction::Append};
+use regex::Regex;
 
 fn main() {
     let matches = command!() // requires `cargo` feature
@@ -12,16 +13,22 @@ fn main() {
         .arg(arg!(<SOURCE_DIR> "Source directory").value_parser(value_parser!(PathBuf)))
         .arg(arg!(<MAIN> "Main file (relative)").value_parser(value_parser!(PathBuf)))
         .arg(
-            arg!(<PACKAGES> "Packages to bundle (relative, use the path you would use in require)")
+            arg!([PACKAGES] "Packages to bundle (relative, use the path you would use in require)")
                 .value_parser(value_parser!(PathBuf))
                 .action(Append),
         )
+        .arg(arg!(-a --"auto-detect" "Automatically detect packages to bundle"))
         .get_matches();
 
-    let packages: Vec<&PathBuf> = matches.get_many::<PathBuf>("PACKAGES").unwrap().collect();
+    let mut packages: Vec<PathBuf> = matches
+        .get_many::<PathBuf>("PACKAGES")
+        .unwrap_or_default()
+        .map(|x| x.clone())
+        .collect();
     let output = matches.get_one::<PathBuf>("OUTPUT").unwrap();
     let source_dir = matches.get_one::<PathBuf>("SOURCE_DIR").unwrap();
     let main = &source_dir.join(matches.get_one::<PathBuf>("MAIN").unwrap());
+    let auto_detect = matches.get_flag("auto-detect");
 
     if !source_dir.is_dir() {
         println!("Source directory has to be a directory.");
@@ -35,6 +42,38 @@ fn main() {
 
     if output.exists() && !output.is_file() {
         println!("Output has to be a file.");
+        return;
+    }
+
+    let mut main_file = match File::open(main) {
+        Ok(file) => file,
+        Err(e) => {
+            println!("Failed to open main file: {}", e);
+            return;
+        }
+    };
+
+    let mut main_contents = String::new();
+    match main_file.read_to_string(&mut main_contents) {
+        Ok(_) => (),
+        Err(e) => {
+            println!("Failed to read main file: {}", e);
+            return;
+        }
+    };
+
+    if auto_detect {
+        let require_regex = Regex::new(r#"require\("([^"]+)"\)"#).unwrap();
+        for capture in require_regex.captures_iter(&main_contents) {
+            let package = PathBuf::from(capture.get(1).unwrap().as_str());
+            if !packages.contains(&package) {
+                packages.push(package);
+            }
+        }
+    }
+
+    if packages.is_empty() {
+        println!("No packages to bundle.");
         return;
     }
 
@@ -66,8 +105,8 @@ end
         let package = &package;
 
         if !package.is_file() {
-            println!("Packages have to be files. ({})", package.display());
-            return;
+            println!("Package {} is not a file.", package.display());
+            continue;
         }
 
         let mut package_file = match File::open(package) {
@@ -96,23 +135,6 @@ end
             package_contents,
         ));
     }
-
-    let mut main_file = match File::open(main) {
-        Ok(file) => file,
-        Err(e) => {
-            println!("Failed to open main file: {}", e);
-            return;
-        }
-    };
-
-    let mut main_contents = String::new();
-    match main_file.read_to_string(&mut main_contents) {
-        Ok(_) => (),
-        Err(e) => {
-            println!("Failed to read main file: {}", e);
-            return;
-        }
-    };
 
     if main_contents.starts_with(
         "local ____bundle__funcs, ____bundle__files, ____bundle__global_require = {}, {}, require
