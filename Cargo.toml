@@ -1,6 +1,6 @@
 [package]
 name = "bundle-lua"
-version = "0.5.1"
+version = "0.5.2"
 edition = "2021"
 license = "MIT"
 description = "Bundle Lua scripts into a single file"

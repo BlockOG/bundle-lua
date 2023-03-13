@@ -7,6 +7,19 @@ use std::{
 use clap::{arg, command, value_parser, ArgAction::Append};
 use regex::Regex;
 
+const BUNDLE_LOGIC: &str =
+    "local ____bundle__funcs, ____bundle__files, ____bundle__global_require = {}, {}, require
+local require = function(path)
+    if ____bundle__files[path] then
+        return ____bundle__files[path]
+    elseif ____bundle__funcs[path] then
+        ____bundle__files[path] = ____bundle__funcs[path]()
+        return ____bundle__files[path]
+    end
+    return ____bundle__global_require(path)
+end
+";
+
 fn main() {
     let matches = command!() // requires `cargo` feature
         .arg(arg!(<OUTPUT> "Output file").value_parser(value_parser!(PathBuf)))
@@ -91,19 +104,7 @@ fn main() {
         return;
     }
 
-    let mut output_contents =
-        "local ____bundle__funcs, ____bundle__files, ____bundle__global_require = {}, {}, require
-local require = function(path)
-    if ____bundle__files[path] then
-        return ____bundle__files[path]
-    elseif ____bundle__funcs[path] then
-        ____bundle__files[path] = ____bundle__funcs[path]()
-        return ____bundle__files[path]
-    end
-    return ____bundle__global_require(path)
-end
-"
-        .to_owned();
+    let mut output_contents = BUNDLE_LOGIC.to_owned();
 
     for package in packages {
         let mut package = source_dir.join(package);
@@ -142,20 +143,8 @@ end
         ));
     }
 
-    if main_contents.starts_with(
-        "local ____bundle__funcs, ____bundle__files, ____bundle__global_require = {}, {}, require
-local require = function(path)
-    if ____bundle__files[path] then
-        return ____bundle__files[path]
-    elseif ____bundle__funcs[path] then
-        ____bundle__files[path] = ____bundle__funcs[path]()
-        return ____bundle__files[path]
-    end
-    return ____bundle__global_require(path)
-end
-",
-    ) {
-        output_contents.push_str(&main_contents[390..]);
+    if main_contents.starts_with(BUNDLE_LOGIC) {
+        output_contents.push_str(&main_contents[BUNDLE_LOGIC.len()..]);
     } else {
         output_contents.push_str(&main_contents);
     }
