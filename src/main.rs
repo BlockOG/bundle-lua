@@ -72,11 +72,6 @@ fn main() {
         }
     }
 
-    if packages.is_empty() {
-        println!("No packages to bundle.");
-        return;
-    }
-
     let mut output_file = match File::create(output) {
         Ok(file) => file,
         Err(e) => {
@@ -84,6 +79,17 @@ fn main() {
             return;
         }
     };
+
+    if packages.is_empty() {
+        match output_file.write_all(main_contents.as_bytes()) {
+            Ok(_) => (),
+            Err(e) => {
+                println!("Failed to write to output file: {}", e);
+                return;
+            }
+        };
+        return;
+    }
 
     let mut output_contents =
         "local ____bundle__funcs, ____bundle__files, ____bundle__global_require = {}, {}, require
